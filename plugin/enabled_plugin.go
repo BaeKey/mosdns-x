@@ -46,5 +46,5 @@ import (
 	_ "github.com/BaeKey/mosdns-x/plugin/executable/ttl"
 	_ "github.com/BaeKey/mosdns-x/plugin/matcher/query_matcher"
 	_ "github.com/BaeKey/mosdns-x/plugin/matcher/response_matcher"
-	_ "github.com/BaeKey/mosdns-x/plugin/matcher/response_matcher"
+	_ "github.com/BaeKey/mosdns-x/plugin/matcher/cdn_matcher"
 )
