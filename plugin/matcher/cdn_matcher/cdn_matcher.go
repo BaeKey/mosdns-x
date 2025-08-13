@@ -32,32 +32,26 @@ func extractMainDomain(domain string) string {
 	domain = strings.TrimSuffix(domain, ".")
 	etldPlusOne, err := publicsuffix.EffectiveTLDPlusOne(domain)
 	if err != nil {
-		// fallback: 手动提取可能的主域名
 		parts := strings.Split(domain, ".")
 		if len(parts) < 2 {
 			return domain
 		}
-		// 返回最后两部分，如 "example.com"
 		return strings.Join(parts[len(parts)-2:], ".")
 	}
 	return etldPlusOne
 }
 
-// 检查IP是否在不同网段
 func hasMultipleNetworks(ips []net.IP) bool {
 	if len(ips) < 2 {
 		return false
 	}
-	
 	networks := make(map[string]struct{})
 	for _, ip := range ips {
 		if ip.To4() != nil {
-			// IPv4: 使用/24网段
 			network := ip.Mask(net.CIDRMask(24, 32)).String()
 			networks[network] = struct{}{}
 		}
 	}
-	
 	return len(networks) >= 2
 }
 
@@ -71,46 +65,46 @@ type shard struct {
 	domains map[string]*domainEntry
 }
 
-// ----------------- CDN Matcher -----------------
+// ----------------- CDN Matcher (含清理) -----------------
 type CDNMatcher struct {
 	shards     []*shard
 	shardCount int
 	ttl        time.Duration
+	stopCh     chan struct{}
+	wg         sync.WaitGroup
 }
 
-func newCDNMatcher(shardCount int, ttl time.Duration) *CDNMatcher {
-	shards := make([]*shard, shardCount)
-	for i := range shards {
-		shards[i] = &shard{domains: make(map[string]*domainEntry)}
-	}
-	
+func newCDNMatcher(shards []*shard, shardCount int, ttl time.Duration) *CDNMatcher {
 	matcher := &CDNMatcher{
 		shards:     shards,
 		shardCount: shardCount,
 		ttl:        ttl,
+		stopCh:     make(chan struct{}),
 	}
-	
-	// 启动清理协程
+	matcher.wg.Add(1)
 	go matcher.startCleaner()
-	
 	return matcher
 }
 
-// 定期清理过期数据
 func (m *CDNMatcher) startCleaner() {
-	ticker := time.NewTicker(m.ttl / 4) // 每1/4 TTL检查一次
+	defer m.wg.Done()
+	ticker := time.NewTicker(m.ttl / 4)
 	defer ticker.Stop()
-	
-	for range ticker.C {
-		now := time.Now()
-		for _, sh := range m.shards {
-			sh.mu.Lock()
-			for domain, entry := range sh.domains {
-				if now.Sub(entry.timestamp) > m.ttl {
-					delete(sh.domains, domain)
+	for {
+		select {
+		case <-ticker.C:
+			now := time.Now()
+			for _, sh := range m.shards {
+				sh.mu.Lock()
+				for domain, entry := range sh.domains {
+					if now.Sub(entry.timestamp) > m.ttl {
+						delete(sh.domains, domain)
+					}
 				}
+				sh.mu.Unlock()
 			}
-			sh.mu.Unlock()
+		case <-m.stopCh:
+			return
 		}
 	}
 }
@@ -122,26 +116,20 @@ func (m *CDNMatcher) Match(ctx context.Context, qCtx *query_context.Context) (bo
 	domain := extractMainDomain(qCtx.Q().Question[0].Name)
 	idx := fnv1aHashIndex(domain, m.shardCount)
 	sh := m.shards[idx]
-	sh.mu.RLock()
+
+	sh.mu.Lock()
+	defer sh.mu.Unlock()
 	entry, ok := sh.domains[domain]
-	if ok {
-		// 检查是否过期
-		if time.Since(entry.timestamp) > m.ttl {
-			sh.mu.RUnlock()
-			// 异步删除过期数据
-			go func() {
-				sh.mu.Lock()
-				delete(sh.domains, domain)
-				sh.mu.Unlock()
-			}()
-			return false, nil
-		}
+	if ok && time.Since(entry.timestamp) > m.ttl {
+		delete(sh.domains, domain)
+		ok = false
 	}
-	sh.mu.RUnlock()
 	return ok, nil
 }
 
 func (m *CDNMatcher) Close() error {
+	close(m.stopCh)
+	m.wg.Wait()
 	return nil
 }
 
@@ -151,28 +139,21 @@ type CDNLearner struct {
 	shardCount    int
 	ipv4Threshold int
 	maxCacheSize  int
-	ttl           time.Duration
 }
 
-func newCDNLearner(shardCount int, ipv4Threshold, maxCacheSize int, ttl time.Duration) *CDNLearner {
-	learner := &CDNLearner{
+func newCDNLearner(shards []*shard, shardCount, ipv4Threshold, maxCacheSize int) *CDNLearner {
+	return &CDNLearner{
+		shards:        shards,
 		shardCount:    shardCount,
-		shards:        make([]*shard, shardCount),
 		ipv4Threshold: ipv4Threshold,
 		maxCacheSize:  maxCacheSize,
-		ttl:           ttl,
 	}
-	for i := range learner.shards {
-		learner.shards[i] = &shard{domains: make(map[string]*domainEntry)}
-	}
-	return learner
 }
 
 func (l *CDNLearner) getShardIndex(domain string) int {
 	return fnv1aHashIndex(domain, l.shardCount)
 }
 
-// 改进的学习逻辑
 func (l *CDNLearner) Learn(qCtx *query_context.Context) {
 	resp := qCtx.R()
 	if resp == nil || len(resp.Answer) == 0 || len(qCtx.Q().Question) == 0 {
@@ -180,15 +161,13 @@ func (l *CDNLearner) Learn(qCtx *query_context.Context) {
 	}
 	domain := extractMainDomain(qCtx.Q().Question[0].Name)
 
-	// 收集IPv4地址
 	var ipv4s []net.IP
 	for _, rr := range resp.Answer {
 		if a, ok := rr.(*dns.A); ok {
 			ipv4s = append(ipv4s, a.A)
 		}
 	}
-	
-	// 改进的CDN判断逻辑
+
 	if !l.isCDNResponse(ipv4s) {
 		return
 	}
@@ -201,19 +180,11 @@ func (l *CDNLearner) Learn(qCtx *query_context.Context) {
 	sh.mu.Unlock()
 }
 
-// 改进的CDN判断逻辑
 func (l *CDNLearner) isCDNResponse(ips []net.IP) bool {
 	if len(ips) < l.ipv4Threshold {
 		return false
 	}
-	
-	// 检查是否有多个不同网段的IP
-	if hasMultipleNetworks(ips) {
-		return true
-	}
-	
-	// 检查IP数量是否达到阈值
-	return len(ips) >= l.ipv4Threshold
+	return hasMultipleNetworks(ips) || len(ips) >= l.ipv4Threshold
 }
 
 // ----------------- CDN Plugin -----------------
@@ -226,6 +197,7 @@ type CDNPlugin struct {
 var _ coremain.Plugin = (*CDNPlugin)(nil)
 
 func (p *CDNPlugin) Close() error {
+	p.Matcher.Close()
 	return nil
 }
 
@@ -264,9 +236,8 @@ func init() {
 func Init(bp *coremain.BP, args interface{}) (coremain.Plugin, error) {
 	cfg := args.(*Args)
 
-	// 设置默认值（使用质数）
 	if cfg.ShardCount <= 0 {
-		cfg.ShardCount = 31 
+		cfg.ShardCount = 31
 	}
 	if cfg.IPv4Threshold <= 0 {
 		cfg.IPv4Threshold = 3
@@ -275,11 +246,17 @@ func Init(bp *coremain.BP, args interface{}) (coremain.Plugin, error) {
 		cfg.MaxCacheSize = 100000
 	}
 	if cfg.TTL <= 0 {
-		cfg.TTL = 24 * time.Hour // 默认24小时过期
+		cfg.TTL = 24 * time.Hour
 	}
 
-	matcher := newCDNMatcher(cfg.ShardCount, cfg.TTL)
-	learner := newCDNLearner(cfg.ShardCount, cfg.IPv4Threshold, cfg.MaxCacheSize, cfg.TTL)
+	// 共享 shards
+	shards := make([]*shard, cfg.ShardCount)
+	for i := range shards {
+		shards[i] = &shard{domains: make(map[string]*domainEntry)}
+	}
+
+	matcher := newCDNMatcher(shards, cfg.ShardCount, cfg.TTL)
+	learner := newCDNLearner(shards, cfg.ShardCount, cfg.IPv4Threshold, cfg.MaxCacheSize)
 
 	return &CDNPlugin{
 		Matcher: matcher,
