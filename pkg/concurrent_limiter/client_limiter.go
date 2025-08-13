@@ -25,8 +25,8 @@ import (
 	"sync"
 	"time"
 
-	"github.com/pmkol/mosdns-x/pkg/concurrent_map"
-	"github.com/pmkol/mosdns-x/pkg/utils"
+	"github.com/BaeKey/mosdns-x/pkg/concurrent_map"
+	"github.com/BaeKey/mosdns-x/pkg/utils"
 )
 
 type ClientLimiter interface {

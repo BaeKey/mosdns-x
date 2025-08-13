@@ -29,7 +29,7 @@ import (
 	"github.com/quic-go/quic-go"
 	"github.com/quic-go/quic-go/http3"
 
-	H "github.com/pmkol/mosdns-x/pkg/server/http_handler"
+	H "github.com/BaeKey/mosdns-x/pkg/server/http_handler"
 )
 
 const defaultQUICIdleTimeout = 30 * time.Second

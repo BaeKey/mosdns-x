@@ -31,7 +31,7 @@ import (
 
 	"github.com/miekg/dns"
 
-	"github.com/pmkol/mosdns-x/pkg/utils"
+	"github.com/BaeKey/mosdns-x/pkg/utils"
 )
 
 func newUDPTestServer(t testing.TB, handler dns.Handler) (addr string, shutdownFunc func()) {

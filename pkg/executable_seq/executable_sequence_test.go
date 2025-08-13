@@ -28,7 +28,7 @@ import (
 	"go.uber.org/zap"
 	"gopkg.in/yaml.v3"
 
-	"github.com/pmkol/mosdns-x/pkg/query_context"
+	"github.com/BaeKey/mosdns-x/pkg/query_context"
 )
 
 func Test_ECS(t *testing.T) {

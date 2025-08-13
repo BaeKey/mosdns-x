@@ -27,11 +27,11 @@ import (
 
 	"github.com/miekg/dns"
 
-	"github.com/pmkol/mosdns-x/pkg/dnsutils"
-	"github.com/pmkol/mosdns-x/pkg/matcher/domain"
-	"github.com/pmkol/mosdns-x/pkg/matcher/elem"
-	"github.com/pmkol/mosdns-x/pkg/matcher/netlist"
-	C "github.com/pmkol/mosdns-x/pkg/query_context"
+	"github.com/BaeKey/mosdns-x/pkg/dnsutils"
+	"github.com/BaeKey/mosdns-x/pkg/matcher/domain"
+	"github.com/BaeKey/mosdns-x/pkg/matcher/elem"
+	"github.com/BaeKey/mosdns-x/pkg/matcher/netlist"
+	C "github.com/BaeKey/mosdns-x/pkg/query_context"
 )
 
 func TestClientIPMatcher_Match(t *testing.T) {

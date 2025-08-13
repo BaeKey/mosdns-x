@@ -27,10 +27,10 @@ import (
 	"github.com/quic-go/quic-go"
 	"go.uber.org/zap"
 
-	"github.com/pmkol/mosdns-x/pkg/dnsutils"
-	"github.com/pmkol/mosdns-x/pkg/pool"
-	C "github.com/pmkol/mosdns-x/pkg/query_context"
-	"github.com/pmkol/mosdns-x/pkg/utils"
+	"github.com/BaeKey/mosdns-x/pkg/dnsutils"
+	"github.com/BaeKey/mosdns-x/pkg/pool"
+	C "github.com/BaeKey/mosdns-x/pkg/query_context"
+	"github.com/BaeKey/mosdns-x/pkg/utils"
 )
 
 type quicCloser struct {

@@ -26,7 +26,7 @@ import (
 	"github.com/miekg/dns"
 	"go.uber.org/zap"
 
-	"github.com/pmkol/mosdns-x/pkg/query_context"
+	"github.com/BaeKey/mosdns-x/pkg/query_context"
 )
 
 type Upstream interface {

@@ -11,9 +11,9 @@ Mosdns-x 是一个用 Go 编写的高性能 DNS 转发器，支持运行插件�
 * DNS over HTTP/2 - DoH
 * DNS over HTTP/3 - DoH3
 
-功能概述、配置方式、教程，详见：[wiki](https://github.com/pmkol/mosdns-x/wiki)
+功能概述、配置方式、教程，详见：[wiki](https://github.com/BaeKey/mosdns-x/wiki)
 
-下载预编译文件、更新日志，详见：[release](https://github.com/pmkol/mosdns-x/releases)
+下载预编译文件、更新日志，详见：[release](https://github.com/BaeKey/mosdns-x/releases)
 
 #### 电报社区：
 

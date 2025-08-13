@@ -29,10 +29,10 @@ import (
 
 	"github.com/spf13/cobra"
 
-	"github.com/pmkol/mosdns-x/mlog"
-	"github.com/pmkol/mosdns-x/pkg/matcher/domain"
-	"github.com/pmkol/mosdns-x/pkg/matcher/netlist"
-	"github.com/pmkol/mosdns-x/pkg/matcher/v2data"
+	"github.com/BaeKey/mosdns-x/mlog"
+	"github.com/BaeKey/mosdns-x/pkg/matcher/domain"
+	"github.com/BaeKey/mosdns-x/pkg/matcher/netlist"
+	"github.com/BaeKey/mosdns-x/pkg/matcher/v2data"
 )
 
 func newUnpackDomainCmd() *cobra.Command {

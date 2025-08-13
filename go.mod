@@ -1,4 +1,4 @@
-module github.com/pmkol/mosdns-x
+module github.com/BaeKey/mosdns-x
 
 go 1.24.0
 

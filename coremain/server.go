@@ -31,10 +31,10 @@ import (
 	"github.com/pires/go-proxyproto"
 	"go.uber.org/zap"
 
-	"github.com/pmkol/mosdns-x/coremain/listen"
-	"github.com/pmkol/mosdns-x/pkg/server"
-	D "github.com/pmkol/mosdns-x/pkg/server/dns_handler"
-	H "github.com/pmkol/mosdns-x/pkg/server/http_handler"
+	"github.com/BaeKey/mosdns-x/coremain/listen"
+	"github.com/BaeKey/mosdns-x/pkg/server"
+	D "github.com/BaeKey/mosdns-x/pkg/server/dns_handler"
+	H "github.com/BaeKey/mosdns-x/pkg/server/http_handler"
 )
 
 const defaultQueryTimeout = time.Second * 5

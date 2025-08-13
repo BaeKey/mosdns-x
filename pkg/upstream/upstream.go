@@ -39,13 +39,13 @@ import (
 	eTLS "gitlab.com/go-extension/tls"
 	"go.uber.org/zap"
 
-	"github.com/pmkol/mosdns-x/pkg/dnsutils"
-	"github.com/pmkol/mosdns-x/pkg/upstream/bootstrap"
-	"github.com/pmkol/mosdns-x/pkg/upstream/doh"
-	"github.com/pmkol/mosdns-x/pkg/upstream/doh3"
-	mQUIC "github.com/pmkol/mosdns-x/pkg/upstream/quic"
-	"github.com/pmkol/mosdns-x/pkg/upstream/transport"
-	"github.com/pmkol/mosdns-x/pkg/upstream/udp"
+	"github.com/BaeKey/mosdns-x/pkg/dnsutils"
+	"github.com/BaeKey/mosdns-x/pkg/upstream/bootstrap"
+	"github.com/BaeKey/mosdns-x/pkg/upstream/doh"
+	"github.com/BaeKey/mosdns-x/pkg/upstream/doh3"
+	mQUIC "github.com/BaeKey/mosdns-x/pkg/upstream/quic"
+	"github.com/BaeKey/mosdns-x/pkg/upstream/transport"
+	"github.com/BaeKey/mosdns-x/pkg/upstream/udp"
 )
 
 // Upstream represents a DNS upstream.

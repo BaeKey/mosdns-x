@@ -35,10 +35,10 @@ import (
 	"github.com/miekg/dns"
 	"go.uber.org/zap"
 
-	"github.com/pmkol/mosdns-x/pkg/dnsutils"
-	"github.com/pmkol/mosdns-x/pkg/pool"
-	C "github.com/pmkol/mosdns-x/pkg/query_context"
-	"github.com/pmkol/mosdns-x/pkg/server/dns_handler"
+	"github.com/BaeKey/mosdns-x/pkg/dnsutils"
+	"github.com/BaeKey/mosdns-x/pkg/pool"
+	C "github.com/BaeKey/mosdns-x/pkg/query_context"
+	"github.com/BaeKey/mosdns-x/pkg/server/dns_handler"
 )
 
 var nopLogger = zap.NewNop()

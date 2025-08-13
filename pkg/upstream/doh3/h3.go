@@ -30,8 +30,8 @@ import (
 	"github.com/miekg/dns"
 	"github.com/quic-go/quic-go/http3"
 
-	C "github.com/pmkol/mosdns-x/constant"
-	"github.com/pmkol/mosdns-x/pkg/pool"
+	C "github.com/BaeKey/mosdns-x/constant"
+	"github.com/BaeKey/mosdns-x/pkg/pool"
 )
 
 const dnsContentType = "application/dns-message"

@@ -26,8 +26,8 @@ import (
 
 	"github.com/miekg/dns"
 
-	"github.com/pmkol/mosdns-x/pkg/pool"
-	"github.com/pmkol/mosdns-x/pkg/utils"
+	"github.com/BaeKey/mosdns-x/pkg/pool"
+	"github.com/BaeKey/mosdns-x/pkg/utils"
 )
 
 // GetMinimalTTL returns the minimal ttl of this msg.

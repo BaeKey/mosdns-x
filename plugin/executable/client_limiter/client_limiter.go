@@ -26,10 +26,10 @@ import (
 
 	"github.com/miekg/dns"
 
-	"github.com/pmkol/mosdns-x/coremain"
-	"github.com/pmkol/mosdns-x/pkg/concurrent_limiter"
-	"github.com/pmkol/mosdns-x/pkg/executable_seq"
-	"github.com/pmkol/mosdns-x/pkg/query_context"
+	"github.com/BaeKey/mosdns-x/coremain"
+	"github.com/BaeKey/mosdns-x/pkg/concurrent_limiter"
+	"github.com/BaeKey/mosdns-x/pkg/executable_seq"
+	"github.com/BaeKey/mosdns-x/pkg/query_context"
 )
 
 const PluginType = "client_limiter"

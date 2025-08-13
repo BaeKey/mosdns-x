@@ -27,7 +27,7 @@ import (
 	"github.com/miekg/dns"
 	"github.com/quic-go/quic-go"
 
-	"github.com/pmkol/mosdns-x/pkg/dnsutils"
+	"github.com/BaeKey/mosdns-x/pkg/dnsutils"
 )
 
 var _ error = (*closedConnError)(nil)

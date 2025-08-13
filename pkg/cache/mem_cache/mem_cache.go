@@ -23,7 +23,7 @@ import (
 	"sync/atomic"
 	"time"
 
-	"github.com/pmkol/mosdns-x/pkg/concurrent_lru"
+	"github.com/BaeKey/mosdns-x/pkg/concurrent_lru"
 )
 
 const (

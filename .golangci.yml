@@ -8,4 +8,4 @@ formatters:
   settings:
     goimports:
       local-prefixes:
-        - github.com/pmkol/mosdns-x
+        - github.com/BaeKey/mosdns-x

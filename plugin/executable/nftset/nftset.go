@@ -20,7 +20,7 @@
 package nftset
 
 import (
-	"github.com/pmkol/mosdns-x/coremain"
+	"github.com/BaeKey/mosdns-x/coremain"
 )
 
 const PluginType = "nftset"

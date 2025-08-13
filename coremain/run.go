@@ -31,7 +31,7 @@ import (
 	"github.com/spf13/viper"
 	"go.uber.org/zap"
 
-	"github.com/pmkol/mosdns-x/mlog"
+	"github.com/BaeKey/mosdns-x/mlog"
 )
 
 type serverFlags struct {

@@ -29,9 +29,9 @@ import (
 	"github.com/miekg/dns"
 	"go.uber.org/zap"
 
-	"github.com/pmkol/mosdns-x/pkg/executable_seq"
-	"github.com/pmkol/mosdns-x/pkg/query_context"
-	"github.com/pmkol/mosdns-x/pkg/utils"
+	"github.com/BaeKey/mosdns-x/pkg/executable_seq"
+	"github.com/BaeKey/mosdns-x/pkg/query_context"
+	"github.com/BaeKey/mosdns-x/pkg/utils"
 )
 
 const (

@@ -22,10 +22,10 @@ package ttl
 import (
 	"context"
 
-	"github.com/pmkol/mosdns-x/coremain"
-	"github.com/pmkol/mosdns-x/pkg/dnsutils"
-	"github.com/pmkol/mosdns-x/pkg/executable_seq"
-	"github.com/pmkol/mosdns-x/pkg/query_context"
+	"github.com/BaeKey/mosdns-x/coremain"
+	"github.com/BaeKey/mosdns-x/pkg/dnsutils"
+	"github.com/BaeKey/mosdns-x/pkg/executable_seq"
+	"github.com/BaeKey/mosdns-x/pkg/query_context"
 )
 
 const (

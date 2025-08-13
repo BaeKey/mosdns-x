@@ -33,10 +33,10 @@ import (
 	"github.com/prometheus/client_golang/prometheus/promhttp"
 	"go.uber.org/zap"
 
-	"github.com/pmkol/mosdns-x/mlog"
-	"github.com/pmkol/mosdns-x/pkg/data_provider"
-	"github.com/pmkol/mosdns-x/pkg/executable_seq"
-	"github.com/pmkol/mosdns-x/pkg/safe_close"
+	"github.com/BaeKey/mosdns-x/mlog"
+	"github.com/BaeKey/mosdns-x/pkg/data_provider"
+	"github.com/BaeKey/mosdns-x/pkg/executable_seq"
+	"github.com/BaeKey/mosdns-x/pkg/safe_close"
 )
 
 type Mosdns struct {

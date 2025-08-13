@@ -27,7 +27,7 @@ import (
 
 	"github.com/miekg/dns"
 
-	"github.com/pmkol/mosdns-x/pkg/pool"
+	"github.com/BaeKey/mosdns-x/pkg/pool"
 )
 
 var errZeroLenMsg = errors.New("zero length msg")

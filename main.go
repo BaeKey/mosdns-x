@@ -25,11 +25,11 @@ import (
 
 	"github.com/spf13/cobra"
 
-	C "github.com/pmkol/mosdns-x/constant"
-	"github.com/pmkol/mosdns-x/coremain"
-	"github.com/pmkol/mosdns-x/mlog"
-	_ "github.com/pmkol/mosdns-x/plugin"
-	_ "github.com/pmkol/mosdns-x/tools"
+	C "github.com/BaeKey/mosdns-x/constant"
+	"github.com/BaeKey/mosdns-x/coremain"
+	"github.com/BaeKey/mosdns-x/mlog"
+	_ "github.com/BaeKey/mosdns-x/plugin"
+	_ "github.com/BaeKey/mosdns-x/tools"
 )
 
 func init() {

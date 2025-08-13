@@ -22,7 +22,7 @@ package lru
 import (
 	"fmt"
 
-	"github.com/pmkol/mosdns-x/pkg/list"
+	"github.com/BaeKey/mosdns-x/pkg/list"
 )
 
 type LRU[K comparable, V any] struct {

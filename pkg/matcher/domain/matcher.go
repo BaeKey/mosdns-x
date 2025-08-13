@@ -24,7 +24,7 @@ import (
 	"regexp"
 	"strings"
 
-	"github.com/pmkol/mosdns-x/pkg/utils"
+	"github.com/BaeKey/mosdns-x/pkg/utils"
 )
 
 var (

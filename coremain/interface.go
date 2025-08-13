@@ -22,7 +22,7 @@ package coremain
 import (
 	"io"
 
-	"github.com/pmkol/mosdns-x/pkg/executable_seq"
+	"github.com/BaeKey/mosdns-x/pkg/executable_seq"
 )
 
 // Plugin represents the basic plugin.

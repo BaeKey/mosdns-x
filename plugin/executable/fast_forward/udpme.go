@@ -24,7 +24,7 @@ import (
 	"net"
 	"time"
 
-	"github.com/pmkol/mosdns-x/pkg/dnsutils"
+	"github.com/BaeKey/mosdns-x/pkg/dnsutils"
 
 	"github.com/miekg/dns"
 )

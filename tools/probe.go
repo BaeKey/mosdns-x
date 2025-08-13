@@ -30,8 +30,8 @@ import (
 	"github.com/miekg/dns"
 	"github.com/spf13/cobra"
 
-	"github.com/pmkol/mosdns-x/mlog"
-	"github.com/pmkol/mosdns-x/pkg/utils"
+	"github.com/BaeKey/mosdns-x/mlog"
+	"github.com/BaeKey/mosdns-x/pkg/utils"
 )
 
 func newIdleTimeoutCmd() *cobra.Command {

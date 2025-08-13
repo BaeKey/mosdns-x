@@ -22,7 +22,7 @@ package tools
 import (
 	"github.com/spf13/cobra"
 
-	"github.com/pmkol/mosdns-x/coremain"
+	"github.com/BaeKey/mosdns-x/coremain"
 )
 
 func init() {

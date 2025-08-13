@@ -28,7 +28,7 @@ import (
 
 	"gitlab.com/go-extension/http"
 
-	H "github.com/pmkol/mosdns-x/pkg/server/http_handler"
+	H "github.com/BaeKey/mosdns-x/pkg/server/http_handler"
 )
 
 func (s *Server) ServeHTTP(l net.Listener) error {

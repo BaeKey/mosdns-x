@@ -26,8 +26,8 @@ import (
 
 	"github.com/miekg/dns"
 
-	"github.com/pmkol/mosdns-x/coremain"
-	"github.com/pmkol/mosdns-x/pkg/query_context"
+	"github.com/BaeKey/mosdns-x/coremain"
+	"github.com/BaeKey/mosdns-x/pkg/query_context"
 )
 
 func Test_blackhole_Exec(t *testing.T) {

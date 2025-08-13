@@ -27,8 +27,8 @@ import (
 
 	"go.uber.org/zap"
 
-	D "github.com/pmkol/mosdns-x/pkg/server/dns_handler"
-	H "github.com/pmkol/mosdns-x/pkg/server/http_handler"
+	D "github.com/BaeKey/mosdns-x/pkg/server/dns_handler"
+	H "github.com/BaeKey/mosdns-x/pkg/server/http_handler"
 )
 
 var (

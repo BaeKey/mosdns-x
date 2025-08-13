@@ -30,9 +30,9 @@ import (
 
 	"google.golang.org/protobuf/proto"
 
-	"github.com/pmkol/mosdns-x/pkg/data_provider"
-	"github.com/pmkol/mosdns-x/pkg/matcher/v2data"
-	"github.com/pmkol/mosdns-x/pkg/utils"
+	"github.com/BaeKey/mosdns-x/pkg/data_provider"
+	"github.com/BaeKey/mosdns-x/pkg/matcher/v2data"
+	"github.com/BaeKey/mosdns-x/pkg/utils"
 )
 
 // ParseStringFunc parse data string to matcher pattern and additional attributions.

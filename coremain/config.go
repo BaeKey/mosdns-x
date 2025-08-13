@@ -20,9 +20,9 @@
 package coremain
 
 import (
-	"github.com/pmkol/mosdns-x/mlog"
-	"github.com/pmkol/mosdns-x/pkg/data_provider"
-	"github.com/pmkol/mosdns-x/pkg/utils"
+	"github.com/BaeKey/mosdns-x/mlog"
+	"github.com/BaeKey/mosdns-x/pkg/data_provider"
+	"github.com/BaeKey/mosdns-x/pkg/utils"
 )
 
 type Config struct {

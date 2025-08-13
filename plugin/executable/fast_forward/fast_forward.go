@@ -30,12 +30,12 @@ import (
 
 	"github.com/miekg/dns"
 
-	"github.com/pmkol/mosdns-x/coremain"
-	"github.com/pmkol/mosdns-x/pkg/bundled_upstream"
-	"github.com/pmkol/mosdns-x/pkg/executable_seq"
-	"github.com/pmkol/mosdns-x/pkg/query_context"
-	"github.com/pmkol/mosdns-x/pkg/upstream"
-	"github.com/pmkol/mosdns-x/pkg/utils"
+	"github.com/BaeKey/mosdns-x/coremain"
+	"github.com/BaeKey/mosdns-x/pkg/bundled_upstream"
+	"github.com/BaeKey/mosdns-x/pkg/executable_seq"
+	"github.com/BaeKey/mosdns-x/pkg/query_context"
+	"github.com/BaeKey/mosdns-x/pkg/upstream"
+	"github.com/BaeKey/mosdns-x/pkg/utils"
 )
 
 const PluginType = "fast_forward"
