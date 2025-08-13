@@ -2,7 +2,7 @@ package cdnmatcher
 
 import (
 	"context"
-	"os"
+	"net"
 	"strings"
 	"sync"
 	"time"
@@ -45,6 +45,24 @@ func extractMainDomain(domain string) string {
 	return etldPlusOne
 }
 
+// 检查IP是否在不同网段
+func hasMultipleNetworks(ips []net.IP) bool {
+	if len(ips) < 2 {
+		return false
+	}
+	
+	networks := make(map[string]struct{})
+	for _, ip := range ips {
+		if ip.To4() != nil {
+			// IPv4: 使用/24网段
+			network := ip.Mask(net.CIDRMask(24, 32)).String()
+			networks[network] = struct{}{}
+		}
+	}
+	
+	return len(networks) >= 2
+}
+
 // ----------------- Shard -----------------
 type shard struct {
 	mu      sync.RWMutex
@@ -62,13 +80,13 @@ func newCDNMatcher(shardCount int) *CDNMatcher {
 	for i := range shards {
 		shards[i] = &shard{domains: make(map[string]struct{})}
 	}
+	
 	return &CDNMatcher{
 		shards:     shards,
 		shardCount: shardCount,
 	}
 }
 
-// MatcherPlugin 接口
 func (m *CDNMatcher) Match(ctx context.Context, qCtx *query_context.Context) (bool, error) {
 	if len(qCtx.Q().Question) == 0 {
 		return false, nil
@@ -92,27 +110,18 @@ type CDNLearner struct {
 	shardCount    int
 	ipv4Threshold int
 	maxCacheSize  int
-	writeQueue    chan string
-	flushInterval time.Duration
-	cacheFile     string
-	stopCh        chan struct{}
 }
 
-func newCDNLearner(shardCount int, ipv4Threshold, maxCacheSize int, flushInterval time.Duration, cacheFile string, queueSize int) *CDNLearner {
+func newCDNLearner(shardCount int, ipv4Threshold, maxCacheSize int) *CDNLearner {
 	learner := &CDNLearner{
 		shardCount:    shardCount,
 		shards:        make([]*shard, shardCount),
 		ipv4Threshold: ipv4Threshold,
 		maxCacheSize:  maxCacheSize,
-		writeQueue:    make(chan string, queueSize),
-		flushInterval: flushInterval,
-		cacheFile:     cacheFile,
-		stopCh:        make(chan struct{}),
 	}
 	for i := range learner.shards {
 		learner.shards[i] = &shard{domains: make(map[string]struct{})}
 	}
-	go learner.startWriter()
 	return learner
 }
 
@@ -120,6 +129,7 @@ func (l *CDNLearner) getShardIndex(domain string) int {
 	return fnv1aHashIndex(domain, l.shardCount)
 }
 
+// 改进的学习逻辑
 func (l *CDNLearner) Learn(qCtx *query_context.Context) {
 	resp := qCtx.R()
 	if resp == nil || len(resp.Answer) == 0 || len(qCtx.Q().Question) == 0 {
@@ -127,13 +137,16 @@ func (l *CDNLearner) Learn(qCtx *query_context.Context) {
 	}
 	domain := extractMainDomain(qCtx.Q().Question[0].Name)
 
-	ipv4Count := 0
+	// 收集IPv4地址
+	var ipv4s []net.IP
 	for _, rr := range resp.Answer {
-		if rr.Header().Rrtype == dns.TypeA {
-			ipv4Count++
+		if a, ok := rr.(*dns.A); ok {
+			ipv4s = append(ipv4s, a.A)
 		}
 	}
-	if ipv4Count <= l.ipv4Threshold {
+	
+	// 改进的CDN判断逻辑
+	if !l.isCDNResponse(ipv4s) {
 		return
 	}
 
@@ -141,50 +154,23 @@ func (l *CDNLearner) Learn(qCtx *query_context.Context) {
 	sh.mu.Lock()
 	if _, exists := sh.domains[domain]; !exists && len(sh.domains) < l.maxCacheSize {
 		sh.domains[domain] = struct{}{}
-		sh.mu.Unlock()
-		select {
-		case l.writeQueue <- domain:
-		default:
-		}
-	} else {
-		sh.mu.Unlock()
 	}
+	sh.mu.Unlock()
 }
 
-func (l *CDNLearner) startWriter() {
-	ticker := time.NewTicker(l.flushInterval)
-	defer ticker.Stop()
-	var buffer []string
-	for {
-		select {
-		case <-l.stopCh:
-			l.flush(buffer)
-			return
-		case domain := <-l.writeQueue:
-			buffer = append(buffer, domain)
-		case <-ticker.C:
-			l.flush(buffer)
-			buffer = buffer[:0]
-		}
+// 改进的CDN判断逻辑
+func (l *CDNLearner) isCDNResponse(ips []net.IP) bool {
+	if len(ips) < l.ipv4Threshold {
+		return false
 	}
-}
-
-func (l *CDNLearner) flush(batch []string) {
-	if len(batch) == 0 {
-		return
+	
+	// 检查是否有多个不同网段的IP
+	if hasMultipleNetworks(ips) {
+		return true
 	}
-	f, err := os.OpenFile(l.cacheFile, os.O_CREATE|os.O_WRONLY|os.O_APPEND, 0644)
-	if err != nil {
-		return
-	}
-	defer f.Close()
-	for _, d := range batch {
-		f.WriteString(d + "\n")
-	}
-}
-
-func (l *CDNLearner) StopWriter() {
-	close(l.stopCh)
+	
+	// 检查IP数量是否达到阈值
+	return len(ips) >= l.ipv4Threshold
 }
 
 // ----------------- CDN Plugin -----------------
@@ -197,7 +183,6 @@ type CDNPlugin struct {
 var _ coremain.Plugin = (*CDNPlugin)(nil)
 
 func (p *CDNPlugin) Close() error {
-	p.Learner.StopWriter()
 	return nil
 }
 
@@ -222,24 +207,20 @@ func (p *CDNPlugin) OnResponse(ctx context.Context, qCtx *query_context.Context)
 
 // ----------------- Init -----------------
 type Args struct {
-	CacheFile     string        `yaml:"cache_file"`
-	ShardCount    int           `yaml:"shard_count"`
-	IPv4Threshold int           `yaml:"ipv4_threshold"`
-	MaxCacheSize  int           `yaml:"max_cache_size"`
-	FlushInterval time.Duration `yaml:"flush_interval"`
-	QueueSize     int           `yaml:"queue_size"`
-	Tag           string        `yaml:"tag"`
+	ShardCount    int    `yaml:"shard_count"`
+	IPv4Threshold int    `yaml:"ipv4_threshold"`
+	MaxCacheSize  int    `yaml:"max_cache_size"`
+	Tag           string `yaml:"tag"`
 }
 
-// 注册插件类型
 func init() {
 	coremain.RegNewPluginFunc(PluginType, Init, func() interface{} { return new(Args) })
 }
 
-// 初始化函数
 func Init(bp *coremain.BP, args interface{}) (coremain.Plugin, error) {
 	cfg := args.(*Args)
 
+	// 设置默认值
 	if cfg.ShardCount <= 0 {
 		cfg.ShardCount = 32
 	}
@@ -249,18 +230,9 @@ func Init(bp *coremain.BP, args interface{}) (coremain.Plugin, error) {
 	if cfg.MaxCacheSize <= 0 {
 		cfg.MaxCacheSize = 100000
 	}
-	if cfg.FlushInterval <= 0 {
-		cfg.FlushInterval = 10 * time.Second
-	}
-	if cfg.QueueSize <= 0 {
-		cfg.QueueSize = 1024
-	}
-	if cfg.CacheFile == "" {
-		cfg.CacheFile = "./cdn_cache.txt"
-	}
 
 	matcher := newCDNMatcher(cfg.ShardCount)
-	learner := newCDNLearner(cfg.ShardCount, cfg.IPv4Threshold, cfg.MaxCacheSize, cfg.FlushInterval, cfg.CacheFile, cfg.QueueSize)
+	learner := newCDNLearner(cfg.ShardCount, cfg.IPv4Threshold, cfg.MaxCacheSize)
 
 	return &CDNPlugin{
 		Matcher: matcher,
