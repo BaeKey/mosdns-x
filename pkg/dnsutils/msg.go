@@ -177,6 +177,28 @@ func GetMsgKey(m *dns.Msg, salt uint16) (string, error) {
 	return utils.BytesToStringUnsafe(wireMsg), nil
 }
 
+func GetMsgKeyWithTag(q *dns.Msg, tag string) string {
+	if len(q.Question) == 0 {
+		return ""
+	}
+	
+	q0 := q.Question[0]
+	name := strings.ToLower(q0.Name)
+
+	var sb strings.Builder
+	sb.Grow(len(name) + len(tag) + 10)
+
+	sb.WriteString(name)
+	sb.WriteByte('|')
+	sb.WriteString(strconv.Itoa(int(q0.Qtype)))
+	sb.WriteByte('|')
+	sb.WriteString(strconv.Itoa(int(q0.Qclass)))
+	sb.WriteByte('|')
+	sb.WriteString(tag)
+
+	return sb.String()
+}
+
 // GetMsgKeyWithBytesSalt unpacks m and appends salt to the string.
 func GetMsgKeyWithBytesSalt(m *dns.Msg, salt []byte) (string, error) {
 	wireMsg, buf, err := pool.PackBuffer(m)

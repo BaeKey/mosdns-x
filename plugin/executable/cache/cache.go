@@ -35,6 +35,7 @@ import (
 	"github.com/pmkol/mosdns-x/pkg/cache"
 	"github.com/pmkol/mosdns-x/pkg/cache/mem_cache"
 	"github.com/pmkol/mosdns-x/pkg/cache/redis_cache"
+	"github.com/pmkol/mosdns-x/pkg/ctxkey"
 	"github.com/pmkol/mosdns-x/pkg/dnsutils"
 	"github.com/pmkol/mosdns-x/pkg/executable_seq"
 	"github.com/pmkol/mosdns-x/pkg/pool"
@@ -159,7 +160,7 @@ func (c *cachePlugin) Exec(ctx context.Context, qCtx *query_context.Context, nex
 	c.queryTotal.Inc()
 	q := qCtx.Q()
 
-	msgKey, err := c.getMsgKey(q)
+	msgKey, err := c.getMsgKey(ctx, q)
 	if err != nil {
 		c.L().Error("get msg key", qCtx.InfoField(), zap.Error(err))
 	}
@@ -200,9 +201,17 @@ func (c *cachePlugin) Exec(ctx context.Context, qCtx *query_context.Context, nex
 
 // getMsgKey returns a string key for the query msg, or an empty
 // string if query should not be cached.
-func (c *cachePlugin) getMsgKey(q *dns.Msg) (string, error) {
+func (c *cachePlugin) getMsgKey(ctx context.Context, q *dns.Msg) (string, error) {
 	isSimpleQuery := len(q.Question) == 1 && len(q.Answer) == 0 && len(q.Ns) == 0 && len(q.Extra) == 0
+
 	if isSimpleQuery || c.args.CacheEverything {
+
+		if val := ctx.Value(ctxkey.CtxKeyIpResolverTag); val != nil {
+			if tag, ok := val.(string); ok && tag != "" {
+				return dnsutils.GetMsgKeyWithTag(q, tag), nil
+			}
+		}
+
 		msgKey, err := dnsutils.GetMsgKey(q, 0)
 		if err != nil {
 			return "", fmt.Errorf("failed to unpack query msg, %w", err)
@@ -275,7 +284,7 @@ func (c *cachePlugin) doLazyUpdate(msgKey string, qCtx *query_context.Context, n
 		baseCtx, cancel := context.WithTimeout(context.Background(), defaultLazyUpdateTimeout)
 		defer cancel()
 
-		lazyCtx := context.WithValue(baseCtx, "mosdns_is_bg_update", true)
+		lazyCtx := context.WithValue(baseCtx, ctxkey.CtxKeyBgUpdate, true)
 
 		err := executable_seq.ExecChainNode(lazyCtx, lazyQCtx, next)
 		if err != nil {
@@ -291,7 +300,7 @@ func (c *cachePlugin) doLazyUpdate(msgKey string, qCtx *query_context.Context, n
 		c.L().Debug("lazy cache updated", lazyQCtx.InfoField())
 		return nil, nil
 	}
-	c.lazyUpdateSF.DoChan(msgKey, lazyUpdateFunc) // DoChan won't block this goroutine
+	c.lazyUpdateSF.DoChan(msgKey, lazyUpdateFunc)
 }
 
 // tryStoreMsg tries to store r to cache. If r should be cached.
