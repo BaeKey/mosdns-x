@@ -79,7 +79,7 @@ func Init(bp *coremain.BP, args interface{}) (coremain.Plugin, error) {
             Timeout:   time.Duration(a.Timeout) * time.Millisecond,
             Transport: transport,
         },
-        cache: mem_cache.NewMemCache(a.CacheSize, time.Minute),
+        cache: mem_cache.NewMemCache(a.CacheSize, 0),
     }, nil
 }
 
@@ -91,11 +91,17 @@ func (p *IPTagger) Exec(ctx context.Context, qCtx *query_context.Context, next e
 
     var lookupKey string
     if clientAddr.Is4() {
-        prefix, _ := clientAddr.Prefix(24)
-        lookupKey = prefix.Addr().String() // 1.2.3.4 -> 1.2.3.0
+        if prefix, err := clientAddr.Prefix(24); err == nil {
+            lookupKey = prefix.Addr().String()
+        } else {
+            lookupKey = clientAddr.String()
+        }
     } else {
-        prefix, _ := clientAddr.Prefix(48)
-        lookupKey = prefix.Addr().String()
+        if prefix, err := clientAddr.Prefix(48); err == nil {
+            lookupKey = prefix.Addr().String()
+        } else {
+            lookupKey = clientAddr.String()
+        }
     }
 
     tag := p.getTag(lookupKey)
@@ -166,13 +172,26 @@ func (p *IPTagger) asyncUpdate(ip string) {
 }
 
 func (p *IPTagger) fetchFromAPI(ip string) (string, error) {
-    targetBase := p.args.APIAddr
-    if strings.HasPrefix(targetBase, "unix://") {
-        targetBase = "http://localhost" 
+    var req *http.Request
+    var err error
+    
+    if strings.HasPrefix(p.args.APIAddr, "unix://") {
+        url := fmt.Sprintf("http://unix/%s", ip)
+        req, err = http.NewRequest(http.MethodGet, url, nil)
+        if err == nil {
+            req.Host = "localhost"
+        }
+    } else {
+        url := fmt.Sprintf("%s/%s", strings.TrimRight(p.args.APIAddr, "/"), ip)
+        req, err = http.NewRequest(http.MethodGet, url, nil)
     }
 
-    url := fmt.Sprintf("%s/%s", strings.TrimRight(targetBase, "/"), ip)
-    resp, err := p.client.Get(url)
+    if err != nil {
+        p.L().Error("failed to create request", zap.Error(err))
+        return ValError, err
+    }
+
+    resp, err := p.client.Do(req)
 
     now := time.Now()
 
@@ -185,7 +204,7 @@ func (p *IPTagger) fetchFromAPI(ip string) (string, error) {
 
 	if resp.StatusCode != http.StatusOK {
 		if resp.StatusCode == http.StatusAccepted {
-			p.cache.Store(ip, []byte(ValFallback), now, now.Add(5*time.Second))
+			p.cache.Store(ip, []byte(ValFallback), now, now.Add(1*time.Second))
 			return "", nil
 		}
 		p.L().Error("api status error",
@@ -224,5 +243,8 @@ func (p *IPTagger) fetchFromAPI(ip string) (string, error) {
 }
 
 func (p *IPTagger) Close() error {
+    if p.client != nil {
+        p.client.CloseIdleConnections()
+    }
 	return p.cache.Close()
 }
