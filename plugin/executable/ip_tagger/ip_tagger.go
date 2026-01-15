@@ -13,10 +13,11 @@ import (
 	"golang.org/x/sync/singleflight"
 
 	"github.com/pmkol/mosdns-x/coremain"
-	"github.com/pmkol/mosdns-x/pkg/cache/mem_cache"
 	"github.com/pmkol/mosdns-x/pkg/ctxkey"
+	"github.com/pmkol/mosdns-x/pkg/cache/mem_cache"
 	"github.com/pmkol/mosdns-x/pkg/executable_seq"
 	"github.com/pmkol/mosdns-x/pkg/query_context"
+	"github.com/prometheus/client_golang/prometheus"
 )
 
 const PluginType = "ip_tagger"
@@ -46,6 +47,7 @@ type IPTagger struct {
 	client *http.Client
 	cache  *mem_cache.MemCache
 	sf     singleflight.Group
+	tagCacheSize prometheus.GaugeFunc
 }
 
 func Init(bp *coremain.BP, args interface{}) (coremain.Plugin, error) {
@@ -72,7 +74,7 @@ func Init(bp *coremain.BP, args interface{}) (coremain.Plugin, error) {
         }
     }
 
-    return &IPTagger{
+    p := &IPTagger{
         BP: bp,
         args: a,
         client: &http.Client{
@@ -80,7 +82,17 @@ func Init(bp *coremain.BP, args interface{}) (coremain.Plugin, error) {
             Transport: transport,
         },
         cache: mem_cache.NewMemCache(a.CacheSize, 0),
-    }, nil
+    }
+
+    p.tagCacheSize = prometheus.NewGaugeFunc(prometheus.GaugeOpts{
+        Name: "ip_tagger_cache_size", 
+        Help: "Number of IP tags currently cached.",
+    }, func() float64 {
+        return float64(p.cache.Len())
+    })
+    bp.GetMetricsReg().MustRegister(p.tagCacheSize)
+
+    return p, nil
 }
 
 func (p *IPTagger) Exec(ctx context.Context, qCtx *query_context.Context, next executable_seq.ExecutableChainNode) error {
