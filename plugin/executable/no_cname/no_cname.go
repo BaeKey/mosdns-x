@@ -53,14 +53,53 @@ func (t *noCNAME) Exec(ctx context.Context, qCtx *query_context.Context, next ex
 		return nil
 	}
 
+	if len(qCtx.Q().Question) == 0 {
+		return nil
+	}
+	question := qCtx.Q().Question[0]
+
+	if question.Qtype != dns.TypeA && question.Qtype != dns.TypeAAAA {
+		return nil
+	}
+
+	hasIP := false
+	for _, rr := range r.Answer {
+		header := rr.Header()
+
+		if header.Rrtype == dns.TypeDNAME {
+			return nil
+		}
+
+		if header.Rrtype == dns.TypeA || header.Rrtype == dns.TypeAAAA {
+			hasIP = true
+		}
+	}
+
+	if !hasIP {
+		return nil
+	}
+
+	qName := question.Name
 	rr := r.Answer[:0]
 	for _, ar := range r.Answer {
 		if ar.Header().Rrtype == dns.TypeCNAME {
 			continue
 		}
+
+		ar.Header().Name = qName
+
 		rr = append(rr, ar)
 	}
 	r.Answer = rr
+	r.Ns = nil
+
+	newExtra := r.Extra[:0]
+	for _, ex := range r.Extra {
+		if ex.Header().Rrtype == dns.TypeOPT {
+			newExtra = append(newExtra, ex)
+		}
+	}
+	r.Extra = newExtra
 
 	return nil
 }
