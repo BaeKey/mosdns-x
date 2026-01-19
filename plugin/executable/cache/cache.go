@@ -230,6 +230,21 @@ func (c *cachePlugin) getMsgKey(ctx context.Context, q *dns.Msg) (string, error)
 		c.defaultTagTotal.Inc()
 		return msgKey, nil
 	}
+	
+	if len(q.Question) == 1 {
+        simpleQ := *q
+        simpleQ.Answer = nil
+        simpleQ.Ns = nil
+        simpleQ.Extra = nil
+
+        msgKey, err := dnsutils.GetMsgKey(&simpleQ, 0)
+        if err != nil {
+            return "", fmt.Errorf("failed to unpack query msg, %w", err)
+        }
+        
+        c.defaultTagTotal.Inc()
+        return msgKey, nil
+    }
 	return "", nil
 }
 
