@@ -47,6 +47,7 @@ import (
 	_ "github.com/pmkol/mosdns-x/plugin/executable/ttl"
 	_ "github.com/pmkol/mosdns-x/plugin/executable/limit_ip"
     _ "github.com/pmkol/mosdns-x/plugin/executable/ip_tagger"
+	_ "github.com/pmkol/mosdns-x/plugin/matcher/multi_ip_matcher"
 	_ "github.com/pmkol/mosdns-x/plugin/matcher/query_is_bg_update"
 	_ "github.com/pmkol/mosdns-x/plugin/matcher/query_matcher"
 	_ "github.com/pmkol/mosdns-x/plugin/matcher/response_matcher"
