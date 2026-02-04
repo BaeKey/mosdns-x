@@ -92,6 +92,14 @@ func newQueryMatcher(bp *coremain.BP, args *Args) (m *queryMatcher, err error) {
 	m = new(queryMatcher)
 	m.BP = bp
 	m.args = args
+	if len(args.QType) > 0 {
+		elemMatcher := elem.NewIntMatcher(args.QType)
+		m.matcherGroup = append(m.matcherGroup, msg_matcher.NewQTypeMatcher(elemMatcher))
+	}
+	if len(args.QClass) > 0 {
+		elemMatcher := elem.NewIntMatcher(args.QClass)
+		m.matcherGroup = append(m.matcherGroup, msg_matcher.NewQClassMatcher(elemMatcher))
+	}
 	if len(args.ClientIP) > 0 {
 		l, err := netlist.BatchLoadProvider(args.ClientIP, bp.M().GetDataManager())
 		if err != nil {
@@ -121,14 +129,6 @@ func newQueryMatcher(bp *coremain.BP, args *Args) (m *queryMatcher, err error) {
 		m.matcherGroup = append(m.matcherGroup, msg_matcher.NewQNameMatcher(mg))
 		m.closer = append(m.closer, mg)
 		bp.L().Info("domain matcher loaded", zap.Int("length", mg.Len()))
-	}
-	if len(args.QType) > 0 {
-		elemMatcher := elem.NewIntMatcher(args.QType)
-		m.matcherGroup = append(m.matcherGroup, msg_matcher.NewQTypeMatcher(elemMatcher))
-	}
-	if len(args.QClass) > 0 {
-		elemMatcher := elem.NewIntMatcher(args.QClass)
-		m.matcherGroup = append(m.matcherGroup, msg_matcher.NewQClassMatcher(elemMatcher))
 	}
 
 	return m, nil
