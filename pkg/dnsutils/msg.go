@@ -27,7 +27,6 @@ import (
 	"github.com/miekg/dns"
 
 	"github.com/pmkol/mosdns-x/pkg/pool"
-	"github.com/pmkol/mosdns-x/pkg/utils"
 )
 
 // GetMinimalTTL returns the minimal ttl of this msg.
@@ -166,37 +165,154 @@ func FakeSOA(name string) *dns.SOA {
 	}
 }
 
-// GetMsgKey unpacks m and set its id to salt.
-func GetMsgKey(m *dns.Msg, salt uint16) (string, error) {
-	wireMsg, err := m.Pack()
+
+func writeCanonicalName(b *strings.Builder, name string) {
+	var buf [255]byte
+	
+	off, err := dns.PackDomainName(name, buf[:], 0, nil, false)
 	if err != nil {
-		return "", err
+		b.WriteString(strings.ToLower(name))
+		return
 	}
-	wireMsg[0] = byte(salt >> 8)
-	wireMsg[1] = byte(salt)
-	return utils.BytesToStringUnsafe(wireMsg), nil
+
+	packed := buf[:off]
+	
+	for i := 0; i < len(packed); i++ {
+		c := packed[i]
+		if 'A' <= c && c <= 'Z' {
+			c += 'a' - 'A'
+		}
+		b.WriteByte(c)
+	}
 }
 
-func GetMsgKeyWithTag(q *dns.Msg, tag string) string {
-	if len(q.Question) == 0 {
+func GetMsgKey(m *dns.Msg, salt uint16) (string, error) {
+	var b strings.Builder
+	b.Grow(128)
+
+	b.WriteByte(byte(salt >> 8))
+	b.WriteByte(byte(salt))
+
+	if len(m.Question) > 0 {
+		q := m.Question[0]
+		writeCanonicalName(&b, q.Name)
+		
+		writeUint16(&b, q.Qtype)
+		writeUint16(&b, q.Qclass)
+	}
+
+	var opt *dns.OPT
+	for _, extra := range m.Extra {
+		if o, ok := extra.(*dns.OPT); ok {
+			opt = o
+			break
+		}
+	}
+
+	var flags uint8
+	if opt != nil && opt.Do() {
+		flags |= 1 << 0
+	}
+	if m.CheckingDisabled {
+		flags |= 1 << 1
+	}
+	if m.RecursionDesired {
+		flags |= 1 << 2
+	}
+	b.WriteByte(flags)
+
+	var ednsVersion uint8 = 0
+	if opt != nil {
+		ednsVersion = uint8((opt.Hdr.Ttl >> 16) & 0xFF)
+	}
+	b.WriteByte(ednsVersion)
+
+	if opt != nil {
+		for _, s := range opt.Option {
+			if ecs, ok := s.(*dns.EDNS0_SUBNET); ok {
+				if ecs.SourceNetmask > 0 {
+					writeUint16(&b, ecs.Family)
+					b.WriteByte(ecs.SourceNetmask)
+					validBytes := int((ecs.SourceNetmask + 7) / 8)
+
+					if validBytes > len(ecs.Address) {
+						validBytes = len(ecs.Address)
+					}
+
+					for i := 0; i < validBytes; i++ {
+						val := ecs.Address[i]
+						if i == validBytes-1 {
+							if remainder := ecs.SourceNetmask % 8; remainder != 0 {
+								mask := byte(0xFF << (8 - remainder))
+								val &= mask
+							}
+						}
+						b.WriteByte(val)
+					}
+				}
+				break
+			}
+		}
+	}
+
+	return b.String(), nil
+}
+
+func GetMsgKeyWithTag(m *dns.Msg, tag string) string {
+	if len(m.Question) == 0 {
 		return ""
 	}
+
+	q := m.Question[0]
+	bufLen := len(q.Name) + 10 + len(tag)
 	
-	q0 := q.Question[0]
-	name := strings.ToLower(q0.Name)
+	var b strings.Builder
+	b.Grow(bufLen)
 
-	var sb strings.Builder
-	sb.Grow(len(name) + len(tag) + 10)
+	writeCanonicalName(&b, q.Name)
 
-	sb.WriteString(name)
-	sb.WriteByte('|')
-	sb.WriteString(strconv.Itoa(int(q0.Qtype)))
-	sb.WriteByte('|')
-	sb.WriteString(strconv.Itoa(int(q0.Qclass)))
-	sb.WriteByte('|')
-	sb.WriteString(tag)
+	writeUint16(&b, q.Qtype)
 
-	return sb.String()
+	writeUint16(&b, q.Qclass)
+
+	var opt *dns.OPT
+	for _, extra := range m.Extra {
+		if o, ok := extra.(*dns.OPT); ok {
+			opt = o
+			break
+		}
+	}
+
+	// 压缩 Flags: DO + CD + RD -> 1 Byte
+	var flags uint8
+	if opt != nil && opt.Do() {
+		flags |= 1 << 0 // Bit 0: DO
+	}
+	if m.CheckingDisabled {
+		flags |= 1 << 1 // Bit 1: CD
+	}
+	if m.RecursionDesired {
+		flags |= 1 << 2 // Bit 2: RD
+	}
+	b.WriteByte(flags)
+
+	// EDNS Version -> 1 Byte
+	var ednsVersion uint8 = 0
+	if opt != nil {
+		ednsVersion = uint8((opt.Hdr.Ttl >> 16) & 0xFF)
+	}
+	b.WriteByte(ednsVersion)
+
+	if len(tag) > 0 {
+		b.WriteString(tag)
+	}
+
+	return b.String()
+}
+
+func writeUint16(b *strings.Builder, v uint16) {
+	b.WriteByte(byte(v >> 8))
+	b.WriteByte(byte(v))
 }
 
 // GetMsgKeyWithBytesSalt unpacks m and appends salt to the string.
