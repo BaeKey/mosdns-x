@@ -43,6 +43,10 @@ func init() {
 	coremain.RegNewPersetPluginFunc("_response_valid_answer", func(bp *coremain.BP) (coremain.Plugin, error) {
 		return &hasValidAnswer{BP: bp}, nil
 	})
+
+	coremain.RegNewPersetPluginFunc("_response_has_cname", func(bp *coremain.BP) (coremain.Plugin, error) {
+		return &hasCNAME{BP: bp}, nil
+	})
 }
 
 var _ coremain.MatcherPlugin = (*responseMatcher)(nil)
@@ -123,21 +127,17 @@ func (e *hasValidAnswer) match(qCtx *query_context.Context) (matched bool) {
 		return false
 	}
 
-	q := qCtx.Q()
-	m := make(map[dns.Question]struct{})
-	for _, question := range q.Question {
-		m[question] = struct{}{}
+	questions := qCtx.Q().Question
+	if len(questions) == 0 {
+		return false
 	}
 
 	for _, rr := range r.Answer {
 		h := rr.Header()
-		q := dns.Question{
-			Name:   h.Name,
-			Qtype:  h.Rrtype,
-			Qclass: h.Class,
-		}
-		if _, ok := m[q]; ok {
-			return true
+		for _, q := range questions {
+			if h.Rrtype == q.Qtype && h.Class == q.Qclass && h.Name == q.Name {
+				return true
+			}
 		}
 	}
 
@@ -146,4 +146,25 @@ func (e *hasValidAnswer) match(qCtx *query_context.Context) (matched bool) {
 
 func (e *hasValidAnswer) Match(_ context.Context, qCtx *query_context.Context) (matched bool, err error) {
 	return e.match(qCtx), nil
+}
+
+type hasCNAME struct {
+	*coremain.BP
+}
+
+var _ coremain.MatcherPlugin = (*hasCNAME)(nil)
+
+func (m *hasCNAME) Match(_ context.Context, qCtx *query_context.Context) (matched bool, err error) {
+	r := qCtx.R()
+	if r == nil {
+		return false, nil
+	}
+
+	for _, rr := range r.Answer {
+		if rr.Header().Rrtype == dns.TypeCNAME {
+			return true, nil
+		}
+	}
+
+	return false, nil
 }
