@@ -22,6 +22,7 @@ package msg_matcher
 import (
 	"context"
 	"net/netip"
+	"sync"
 
 	"github.com/miekg/dns"
 
@@ -32,12 +33,57 @@ import (
 	"github.com/pmkol/mosdns-x/pkg/query_context"
 )
 
+const defaultCacheSize = 16384
+
+type boolCache[K comparable] struct {
+	mu   sync.RWMutex
+	curr map[K]bool
+	prev map[K]bool
+}
+
+func newBoolCache[K comparable]() *boolCache[K] {
+	return &boolCache[K]{
+		curr: make(map[K]bool, defaultCacheSize),
+		prev: make(map[K]bool, defaultCacheSize),
+	}
+}
+
+func (c *boolCache[K]) get(k K) (bool, bool) {
+	c.mu.RLock()
+	if v, ok := c.curr[k]; ok {
+		c.mu.RUnlock()
+		return v, true
+	}
+	if v, ok := c.prev[k]; ok {
+		c.mu.RUnlock()
+		c.set(k, v)
+		return v, true
+	}
+	c.mu.RUnlock()
+	return false, false
+}
+
+func (c *boolCache[K]) set(k K, v bool) {
+	c.mu.Lock()
+	if len(c.curr) >= defaultCacheSize {
+		c.prev = c.curr
+		c.curr = make(map[K]bool, defaultCacheSize)
+	}
+	c.curr[k] = v
+	c.mu.Unlock()
+}
+
+
 type ClientIPMatcher struct {
 	ipMatcher netlist.Matcher
+	cache *boolCache[netip.Addr]
 }
 
 func NewClientIPMatcher(ipMatcher netlist.Matcher) *ClientIPMatcher {
-	return &ClientIPMatcher{ipMatcher: ipMatcher}
+	return &ClientIPMatcher{
+		ipMatcher: ipMatcher,
+		cache: newBoolCache[netip.Addr](),
+	}
 }
 
 func (m *ClientIPMatcher) Match(_ context.Context, qCtx *query_context.Context) (matched bool, err error) {
@@ -45,31 +91,66 @@ func (m *ClientIPMatcher) Match(_ context.Context, qCtx *query_context.Context) 
 	if !clientAddr.IsValid() {
 		return false, nil
 	}
-	return m.ipMatcher.Match(clientAddr)
+
+	if v, ok := m.cache.get(clientAddr); ok {
+		return v, nil
+	}
+
+	matched, err = m.ipMatcher.Match(clientAddr)
+	if err != nil {
+		return false, err
+	}
+
+	m.cache.set(clientAddr, matched)
+	return matched, nil
 }
+
 
 type ClientECSMatcher struct {
 	ipMatcher netlist.Matcher
+	cache *boolCache[netip.Addr]
 }
 
 func NewClientECSMatcher(ipMatcher netlist.Matcher) *ClientECSMatcher {
-	return &ClientECSMatcher{ipMatcher: ipMatcher}
+	return &ClientECSMatcher{
+		ipMatcher: ipMatcher,
+		cache: newBoolCache[netip.Addr](),
+	}
 }
 
 func (m *ClientECSMatcher) Match(_ context.Context, qCtx *query_context.Context) (matched bool, err error) {
-	if ecs := dnsutils.GetMsgECS(qCtx.Q()); ecs != nil {
-		addr, _ := netip.AddrFromSlice(ecs.Address)
-		return m.ipMatcher.Match(addr)
+	ecs := dnsutils.GetMsgECS(qCtx.Q())
+	if ecs == nil {
+		return false, nil
 	}
-	return false, nil
+	addr, ok := netip.AddrFromSlice(ecs.Address)
+	if !ok {
+		return false, nil
+	}
+
+	if v, ok := m.cache.get(addr); ok {
+		return v, nil
+	}
+
+	matched, err = m.ipMatcher.Match(addr)
+	if err != nil {
+		return false, err
+	}
+
+	m.cache.set(addr, matched)
+	return matched, nil
 }
 
 type QNameMatcher struct {
 	domainMatcher domain.Matcher[struct{}]
+	cache *boolCache[string]
 }
 
 func NewQNameMatcher(domainMatcher domain.Matcher[struct{}]) *QNameMatcher {
-	return &QNameMatcher{domainMatcher: domainMatcher}
+	return &QNameMatcher{
+		domainMatcher: domainMatcher,
+		cache: newBoolCache[string](),
+	}
 }
 
 func (m *QNameMatcher) Match(_ context.Context, qCtx *query_context.Context) (matched bool, _ error) {
@@ -78,8 +159,20 @@ func (m *QNameMatcher) Match(_ context.Context, qCtx *query_context.Context) (ma
 
 func (m *QNameMatcher) MatchMsg(msg *dns.Msg) bool {
 	for i := range msg.Question {
-		_, ok := m.domainMatcher.Match(msg.Question[i].Name)
-		if ok {
+		qName := msg.Question[i].Name
+
+		if v, ok := m.cache.get(qName); ok {
+			if v {
+				return true
+			}
+			continue
+		}
+
+		_, matched := m.domainMatcher.Match(qName)
+
+		m.cache.set(qName, matched)
+
+		if matched {
 			return true
 		}
 	}
