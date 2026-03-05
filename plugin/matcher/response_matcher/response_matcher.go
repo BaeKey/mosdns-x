@@ -127,16 +127,34 @@ func (e *hasValidAnswer) match(qCtx *query_context.Context) (matched bool) {
 		return false
 	}
 
-	questions := qCtx.Q().Question
-	if len(questions) == 0 {
-		return false
+	cnameMap := make(map[string]string)
+	for _, rr := range r.Answer {
+		if cname, ok := rr.(*dns.CNAME); ok {
+			cnameMap[dns.CanonicalName(cname.Hdr.Name)] = dns.CanonicalName(cname.Target)
+		}
 	}
 
-	for _, rr := range r.Answer {
-		h := rr.Header()
-		for _, q := range questions {
-			if h.Rrtype == q.Qtype && h.Class == q.Qclass && h.Name == q.Name {
-				return true
+	q := qCtx.Q()
+	for _, question := range q.Question {
+		validNames := make(map[string]struct{})
+		name := dns.CanonicalName(question.Name)
+		for {
+			validNames[name] = struct{}{}
+			target, ok := cnameMap[name]
+			if !ok {
+				break
+			}
+			if _, seen := validNames[target]; seen {
+				break
+			}
+			name = target
+		}
+		for _, rr := range r.Answer {
+			h := rr.Header()
+			if h.Rrtype == question.Qtype && h.Class == question.Qclass {
+				if _, ok := validNames[dns.CanonicalName(h.Name)]; ok {
+					return true
+				}
 			}
 		}
 	}
