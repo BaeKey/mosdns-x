@@ -37,6 +37,7 @@ const defaultCacheSize = 16384
 
 type boolCache[K comparable] struct {
 	mu   sync.RWMutex
+	version uint64
 	curr map[K]bool
 	prev map[K]bool
 }
@@ -46,6 +47,23 @@ func newBoolCache[K comparable]() *boolCache[K] {
 		curr: make(map[K]bool, defaultCacheSize),
 		prev: make(map[K]bool, defaultCacheSize),
 	}
+}
+
+func (c *boolCache[K]) resetIfVersionChanged(version uint64) {
+	c.mu.RLock()
+	if c.version == version {
+		c.mu.RUnlock()
+		return
+	}
+	c.mu.RUnlock()
+
+	c.mu.Lock()
+	if c.version != version {
+		c.version = version
+		c.curr = make(map[K]bool, defaultCacheSize)
+		c.prev = make(map[K]bool, defaultCacheSize)
+	}
+	c.mu.Unlock()
 }
 
 func (c *boolCache[K]) get(k K) (bool, bool) {
@@ -73,6 +91,19 @@ func (c *boolCache[K]) set(k K, v bool) {
 	c.mu.Unlock()
 }
 
+func netlistVersion(m netlist.Matcher) uint64 {
+	if versioned, ok := m.(netlist.Versioned); ok {
+		return versioned.Version()
+	}
+	return 0
+}
+
+func domainVersion(m domain.Matcher[struct{}]) uint64 {
+	if versioned, ok := m.(domain.Versioned); ok {
+		return versioned.Version()
+	}
+	return 0
+}
 
 type ClientIPMatcher struct {
 	ipMatcher netlist.Matcher
@@ -92,6 +123,7 @@ func (m *ClientIPMatcher) Match(_ context.Context, qCtx *query_context.Context) 
 		return false, nil
 	}
 
+	m.cache.resetIfVersionChanged(netlistVersion(m.ipMatcher))
 	if v, ok := m.cache.get(clientAddr); ok {
 		return v, nil
 	}
@@ -104,7 +136,6 @@ func (m *ClientIPMatcher) Match(_ context.Context, qCtx *query_context.Context) 
 	m.cache.set(clientAddr, matched)
 	return matched, nil
 }
-
 
 type ClientECSMatcher struct {
 	ipMatcher netlist.Matcher
@@ -128,6 +159,7 @@ func (m *ClientECSMatcher) Match(_ context.Context, qCtx *query_context.Context)
 		return false, nil
 	}
 
+	m.cache.resetIfVersionChanged(netlistVersion(m.ipMatcher))
 	if v, ok := m.cache.get(addr); ok {
 		return v, nil
 	}
@@ -158,6 +190,7 @@ func (m *QNameMatcher) Match(_ context.Context, qCtx *query_context.Context) (ma
 }
 
 func (m *QNameMatcher) MatchMsg(msg *dns.Msg) bool {
+	m.cache.resetIfVersionChanged(domainVersion(m.domainMatcher))
 	for i := range msg.Question {
 		qName := msg.Question[i].Name
 

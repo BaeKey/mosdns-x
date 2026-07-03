@@ -27,3 +27,7 @@ type Matcher interface {
 	Match(addr netip.Addr) (bool, error)
 	Len() int
 }
+
+type Versioned interface {
+	Version() uint64
+}

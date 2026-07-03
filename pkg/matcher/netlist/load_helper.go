@@ -40,6 +40,16 @@ type MatcherGroup struct {
 	closer []func()
 }
 
+func (m *MatcherGroup) Version() uint64 {
+	var v uint64
+	for _, sub := range m.g {
+		if versioned, ok := sub.(Versioned); ok {
+			v += versioned.Version()
+		}
+	}
+	return v
+}
+
 func (m *MatcherGroup) Len() int {
 	s := 0
 	for _, l := range m.g {
@@ -71,6 +81,7 @@ func (m *MatcherGroup) Close() error {
 type DynamicMatcher struct {
 	parseFunc func(in []byte) (*List, error)
 	v         atomic.Value
+	version   atomic.Uint64
 }
 
 func NewDynamicMatcher(parseFunc func(in []byte) (*List, error)) *DynamicMatcher {
@@ -83,6 +94,7 @@ func (d *DynamicMatcher) Update(newData []byte) error {
 		return err
 	}
 	d.v.Store(list)
+	d.version.Add(1)
 	return nil
 }
 
@@ -92,6 +104,10 @@ func (d *DynamicMatcher) Match(addr netip.Addr) (bool, error) {
 
 func (d *DynamicMatcher) Len() int {
 	return d.v.Load().(*List).Len()
+}
+
+func (d *DynamicMatcher) Version() uint64 {
+	return d.version.Load()
 }
 
 // BatchLoadProvider is a helper func to load multiple files using Load.

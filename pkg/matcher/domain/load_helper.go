@@ -74,6 +74,16 @@ type MatcherGroup[T any] struct {
 	closer []func()
 }
 
+func (m *MatcherGroup[T]) Version() uint64 {
+	var v uint64
+	for _, sub := range m.g {
+		if versioned, ok := sub.(Versioned); ok {
+			v += versioned.Version()
+		}
+	}
+	return v
+}
+
 func (m *MatcherGroup[T]) Close() error {
 	for _, f := range m.closer {
 		f()
@@ -197,6 +207,7 @@ type DynamicMatcher[T any] struct {
 	parserFunc func(b []byte) (Matcher[T], error)
 	l          sync.RWMutex
 	m          Matcher[T]
+	version    uint64
 }
 
 func NewDynamicMatcher[T any](parserFunc func(b []byte) (Matcher[T], error)) *DynamicMatcher[T] {
@@ -217,6 +228,13 @@ func (d *DynamicMatcher[T]) Len() int {
 	return m.Len()
 }
 
+func (d *DynamicMatcher[T]) Version() uint64 {
+	d.l.RLock()
+	v := d.version
+	d.l.RUnlock()
+	return v
+}
+
 func (d *DynamicMatcher[T]) Update(b []byte) error {
 	m, err := d.parserFunc(b)
 	if err != nil {
@@ -224,6 +242,7 @@ func (d *DynamicMatcher[T]) Update(b []byte) error {
 	}
 	d.l.Lock()
 	d.m = m
+	d.version++
 	d.l.Unlock()
 	return nil
 }

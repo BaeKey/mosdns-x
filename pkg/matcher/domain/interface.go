@@ -31,6 +31,10 @@ type Matcher[T any] interface {
 	Len() int
 }
 
+type Versioned interface {
+	Version() uint64
+}
+
 type WriteableMatcher[T any] interface {
 	Matcher[T]
 	Add(pattern string, v T) error

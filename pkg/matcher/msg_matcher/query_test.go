@@ -80,6 +80,35 @@ func TestClientIPMatcher_Match(t *testing.T) {
 	}
 }
 
+func TestClientIPMatcher_cacheResetAfterVersionChange(t *testing.T) {
+	dm := netlist.NewDynamicMatcher(func(b []byte) (*netlist.List, error) {
+		l := netlist.NewList()
+		if err := netlist.LoadFromText(l, string(b)); err != nil {
+			return nil, err
+		}
+		l.Sort()
+		return l, nil
+	})
+	if err := dm.Update([]byte("127.0.0.0/24")); err != nil {
+		t.Fatal(err)
+	}
+
+	m := NewClientIPMatcher(dm)
+	qCtx := C.NewContext(new(dns.Msg), C.NewRequestMeta(netip.MustParseAddr("127.0.0.1")))
+	matched, err := m.Match(context.Background(), qCtx)
+	if err != nil || !matched {
+		t.Fatalf("want initial match, got %v, err %v", matched, err)
+	}
+
+	if err := dm.Update([]byte("128.0.0.0/24")); err != nil {
+		t.Fatal(err)
+	}
+	matched, err = m.Match(context.Background(), qCtx)
+	if err != nil || matched {
+		t.Fatalf("want cache reset after update, got %v, err %v", matched, err)
+	}
+}
+
 func TestClientECSMatcher_Match(t *testing.T) {
 	nl := netlist.NewList()
 	if err := netlist.LoadFromText(nl, "127.0.0.0/24"); err != nil {
@@ -142,6 +171,33 @@ func TestQNameMatcher_Match(t *testing.T) {
 	m.SetQuestion("example.xxx.", dns.TypeA)
 	if qm.MatchMsg(m) {
 		t.Fatal()
+	}
+}
+
+func TestQNameMatcher_cacheResetAfterVersionChange(t *testing.T) {
+	dm := domain.NewDynamicMatcher(func(b []byte) (domain.Matcher[struct{}], error) {
+		m := domain.NewDomainMixMatcher()
+		if err := domain.Load(m, string(b), nil); err != nil {
+			return nil, err
+		}
+		return m, nil
+	})
+	if err := dm.Update([]byte("domain:example.com")); err != nil {
+		t.Fatal(err)
+	}
+
+	qm := NewQNameMatcher(dm)
+	msg := new(dns.Msg)
+	msg.SetQuestion("www.example.com.", dns.TypeA)
+	if !qm.MatchMsg(msg) {
+		t.Fatal("want initial match")
+	}
+
+	if err := dm.Update([]byte("domain:example.net")); err != nil {
+		t.Fatal(err)
+	}
+	if qm.MatchMsg(msg) {
+		t.Fatal("want cache reset after update")
 	}
 }
 

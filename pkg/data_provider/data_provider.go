@@ -20,6 +20,7 @@
 package data_provider
 
 import (
+	"crypto/sha256"
 	"fmt"
 	"os"
 	"sync"
@@ -71,6 +72,8 @@ type DataProvider struct {
 
 	lm        sync.Mutex
 	listeners map[DataListener]struct{}
+	dataHash  [sha256.Size]byte
+	hasHash   bool
 
 	sc *safe_close.SafeClose
 }
@@ -90,10 +93,11 @@ func NewDataProvider(lg *zap.Logger, cfg DataProviderConfig) (*DataProvider, err
 }
 
 func (ds *DataProvider) init() error {
-	_, err := ds.loadFromDisk()
+	b, err := ds.loadFromDisk()
 	if err != nil {
 		return err
 	}
+	ds.setDataHash(b)
 
 	if ds.autoReload {
 		if err := ds.startFsWatcher(); err != nil {
@@ -101,6 +105,21 @@ func (ds *DataProvider) init() error {
 		}
 	}
 	return nil
+}
+
+func (ds *DataProvider) setDataHash(b []byte) {
+	ds.dataHash = sha256.Sum256(b)
+	ds.hasHash = true
+}
+
+func (ds *DataProvider) dataHashChanged(b []byte) bool {
+	h := sha256.Sum256(b)
+	if ds.hasHash && h == ds.dataHash {
+		return false
+	}
+	ds.dataHash = h
+	ds.hasHash = true
+	return true
 }
 
 func (ds *DataProvider) Close() {
@@ -215,6 +234,11 @@ func (ds *DataProvider) startFsWatcher() error {
 								"failed to reload file",
 								zap.String("file", ds.file),
 								zap.Error(err),
+							)
+						} else if !ds.dataHashChanged(v) {
+							ds.logger.Info(
+								"file unchanged, skip reload",
+								zap.String("file", ds.file),
 							)
 						} else {
 							ds.logger.Info(
