@@ -205,6 +205,8 @@ func (m *Mosdns) startServerListener(cfg *ServerListenerConfig, dnsHandler D.Han
 		case err := <-errChan:
 			m.sc.SendCloseSignal(fmt.Errorf("server exited, %w", err))
 		case <-closeSignal:
+			s.Close()
+			<-errChan
 		}
 	})
 

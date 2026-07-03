@@ -72,6 +72,14 @@ func (c *ShardedLRU[V]) Get(key string) (v V, ok bool) {
 	return
 }
 
+func (c *ShardedLRU[V]) Range(f func(key string, v V) bool) {
+	for i := range c.l {
+		if !c.l[i].Range(f) {
+			return
+		}
+	}
+}
+
 func (c *ShardedLRU[V]) Len() int {
 	sum := 0
 	for _, shard := range c.l {
@@ -133,6 +141,21 @@ func (c *ConcurrentLRU[K, V]) Get(key K) (v V, ok bool) {
 
 	v, ok = c.lru.Get(key)
 	return
+}
+
+func (c *ConcurrentLRU[K, V]) Range(f func(key K, v V) bool) bool {
+	c.Lock()
+	defer c.Unlock()
+
+	stopped := false
+	c.lru.Range(func(key K, v V) bool {
+		if !f(key, v) {
+			stopped = true
+			return false
+		}
+		return true
+	})
+	return !stopped
 }
 
 func (c *ConcurrentLRU[K, V]) Len() int {

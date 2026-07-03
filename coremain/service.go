@@ -56,6 +56,7 @@ func (ss *serverService) Start(s service.Service) error {
 }
 
 func (ss *serverService) Stop(s service.Service) error {
+	StopMosdns()
 	return nil
 }
 

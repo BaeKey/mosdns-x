@@ -62,6 +62,29 @@ func Test_memCache_cleaner(t *testing.T) {
 	}
 }
 
+func Test_memCache_dump(t *testing.T) {
+	c := NewMemCache(1024, -1)
+	defer c.Close()
+
+	now := time.Now()
+	c.Store("valid", []byte{1, 2, 3}, now, now.Add(time.Minute))
+	c.Store("expired", []byte{4, 5, 6}, now.Add(-time.Minute), now.Add(-time.Second))
+
+	items := c.Dump()
+	if len(items) != 1 {
+		t.Fatalf("unexpected dump len %d", len(items))
+	}
+	if items[0].Key != "valid" || len(items[0].Value) != 3 || items[0].Value[0] != 1 {
+		t.Fatalf("unexpected dump item %#v", items[0])
+	}
+
+	items[0].Value[0] = 9
+	v, _, _ := c.Get("valid")
+	if v[0] != 1 {
+		t.Fatal("dump did not copy value")
+	}
+}
+
 func Test_memCache_race(t *testing.T) {
 	c := NewMemCache(1024, -1)
 	defer c.Close()

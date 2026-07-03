@@ -195,7 +195,7 @@ func (f *fastForward) exec(ctx context.Context, qCtx *query_context.Context) (er
 	return nil
 }
 
-func (f *fastForward) Shutdown() error {
+func (f *fastForward) Close() error {
 	for _, u := range f.upstreamsCloser {
 		u.Close()
 	}

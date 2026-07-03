@@ -24,8 +24,12 @@ import (
 	"fmt"
 	"net/http"
 	"net/http/pprof"
+	"os"
+	"os/signal"
 	"runtime"
 	"runtime/debug"
+	"sync"
+	"syscall"
 	"time"
 
 	"github.com/prometheus/client_golang/prometheus"
@@ -46,6 +50,7 @@ type Mosdns struct {
 	dataManager *data_provider.DataManager
 
 	// Plugins
+	plugins  []Plugin
 	execs    map[string]executable_seq.Executable
 	matchers map[string]executable_seq.Matcher
 
@@ -55,6 +60,11 @@ type Mosdns struct {
 	metricsReg *prometheus.Registry
 
 	sc *safe_close.SafeClose
+}
+
+var currentMosdns struct {
+	sync.Mutex
+	m *Mosdns
 }
 
 func RunMosdns(cfg *Config) error {
@@ -79,6 +89,20 @@ func RunMosdns(cfg *Config) error {
 	m.httpAPIMux.HandleFunc("/debug/pprof/profile", pprof.Profile)
 	m.httpAPIMux.HandleFunc("/debug/pprof/symbol", pprof.Symbol)
 	m.httpAPIMux.HandleFunc("/debug/pprof/trace", pprof.Trace)
+
+	setCurrentMosdns(m)
+	defer setCurrentMosdns(nil)
+	stopSignal := make(chan os.Signal, 1)
+	signal.Notify(stopSignal, os.Interrupt, syscall.SIGTERM)
+	defer signal.Stop(stopSignal)
+	go func() {
+		select {
+		case sig := <-stopSignal:
+			m.logger.Info("received signal", zap.Stringer("signal", sig))
+			m.sc.SendCloseSignal(nil)
+		case <-m.sc.ReceiveCloseSignal():
+		}
+	}()
 
 	// Init data manager
 	dupTag := make(map[string]struct{})
@@ -169,10 +193,33 @@ func RunMosdns(cfg *Config) error {
 	<-m.sc.ReceiveCloseSignal()
 	m.sc.Done()
 	m.sc.CloseWait()
+	if err := m.closePlugins(); err != nil {
+		if m.sc.Err() != nil {
+			return errors.Join(m.sc.Err(), err)
+		}
+		return err
+	}
 	return m.sc.Err()
 }
 
+func StopMosdns() {
+	currentMosdns.Lock()
+	m := currentMosdns.m
+	currentMosdns.Unlock()
+	if m != nil {
+		m.sc.SendCloseSignal(nil)
+	}
+}
+
+func setCurrentMosdns(m *Mosdns) {
+	currentMosdns.Lock()
+	defer currentMosdns.Unlock()
+	currentMosdns.m = m
+}
+
 func (m *Mosdns) addPlugin(p Plugin) {
+	m.plugins = append(m.plugins, p)
+
 	t := p.Tag()
 	if p, ok := p.(ExecutablePlugin); ok {
 		m.execs[t] = p
@@ -180,6 +227,19 @@ func (m *Mosdns) addPlugin(p Plugin) {
 	if p, ok := p.(MatcherPlugin); ok {
 		m.matchers[p.Tag()] = p
 	}
+}
+
+func (m *Mosdns) closePlugins() error {
+	var firstErr error
+	for _, p := range m.plugins {
+		if err := p.Close(); err != nil {
+			m.logger.Warn("failed to close plugin", zap.String("tag", p.Tag()), zap.String("type", p.Type()), zap.Error(err))
+			if firstErr == nil {
+				firstErr = fmt.Errorf("failed to close plugin %s, %w", p.Tag(), err)
+			}
+		}
+	}
+	return firstErr
 }
 
 func (m *Mosdns) GetDataManager() *data_provider.DataManager {

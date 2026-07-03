@@ -126,6 +126,14 @@ func (q *LRU[K, V]) Get(key K) (v V, ok bool) {
 	return e.Value.v, true
 }
 
+func (q *LRU[K, V]) Range(f func(key K, v V) bool) {
+	for e := q.l.Front(); e != nil; e = e.Next() {
+		if !f(e.Value.key, e.Value.v) {
+			return
+		}
+	}
+}
+
 func (q *LRU[K, V]) Len() int {
 	return q.l.Len()
 }

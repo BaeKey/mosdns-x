@@ -45,6 +45,13 @@ type elem struct {
 	expirationTime time.Time
 }
 
+type DumpedElem struct {
+	Key            string
+	Value          []byte
+	StoredTime     time.Time
+	ExpirationTime time.Time
+}
+
 // NewMemCache initializes a MemCache.
 // The minimum size is 1024.
 // cleanerInterval specifies the interval that MemCache scans
@@ -109,6 +116,31 @@ func (c *MemCache) Store(key string, v []byte, storedTime, expirationTime time.T
 	}
 	c.lru.Add(key, e)
 	return
+}
+
+func (c *MemCache) Dump() []DumpedElem {
+	if c.isClosed() {
+		return nil
+	}
+
+	now := time.Now()
+	items := make([]DumpedElem, 0, c.Len())
+	c.lru.Range(func(key string, e *elem) bool {
+		if e.expirationTime.Before(now) {
+			return true
+		}
+
+		buf := make([]byte, len(e.v))
+		copy(buf, e.v)
+		items = append(items, DumpedElem{
+			Key:            key,
+			Value:          buf,
+			StoredTime:     e.storedTime,
+			ExpirationTime: e.expirationTime,
+		})
+		return true
+	})
+	return items
 }
 
 func (c *MemCache) startCleaner(interval time.Duration) {

@@ -100,7 +100,3 @@ func (t *answerShuffle) Exec(ctx context.Context, qCtx *query_context.Context, n
 
 	return nil
 }
-
-func (t *answerShuffle) Shutdown() error {
-	return nil
-}
