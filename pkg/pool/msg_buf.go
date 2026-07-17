@@ -29,8 +29,13 @@ import (
 const packBufSize = 4096
 
 // PackBuffer packs the dns msg m to wire format.
+// It enables standard DNS name compression (RFC 1035) so the resulting
+// wire format is typically smaller when domain names are repeated.
 // Callers should release the buf after they have done with the wire []byte.
 func PackBuffer(m *dns.Msg) (wire []byte, buf *Buffer, err error) {
+	// Compress before packing so all call sites (UDP/TCP/DoH/DoQ/upstream)
+	// emit RFC 1035 compressed messages by default.
+	m.Compress = true
 	buf = GetBuf(packBufSize)
 	wire, err = m.PackBuffer(buf.Bytes())
 	if err != nil {

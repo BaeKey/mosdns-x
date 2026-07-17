@@ -97,6 +97,9 @@ func (s *Server) ServeUDP(c net.PacketConn) error {
 				return
 			}
 			if r != nil {
+				// Enable compression before Truncate so size checks and
+				// possible TC decisions are based on the compressed length.
+				r.Compress = true
 				r.Truncate(getUDPSize(q))
 				b, buf, err := pool.PackBuffer(r)
 				if err != nil {
